@@ -24,13 +24,21 @@ object BattlePanel {
     private const val PAD = 4
     private const val LINE = 10
 
+    /** Pokémon regardé hors combat (mis à jour à chaque tick). */
+    private var lookedAt: CobbleBridge.Foe? = null
+    private var wasInBattle = false
+
     fun onTick() {
-        if (!CobbleBridge.inBattle()) typeOverride = null
+        val inBattle = CobbleBridge.inBattle()
+        if (wasInBattle && !inBattle) typeOverride = null // fin de combat : on oublie le type forcé
+        wasInBattle = inBattle
+        val s = ModConfig.settings
+        lookedAt = if (!inBattle && enabled && s.lookPanel) CobbleBridge.lookedAtFoe(s.lookDistance) else null
     }
 
     fun render(g: GuiGraphics) {
         if (!enabled) return
-        val foes = CobbleBridge.currentFoes()
+        val foes = if (CobbleBridge.inBattle()) CobbleBridge.currentFoes() else listOfNotNull(lookedAt)
         if (foes.isEmpty()) return
         val lines = buildLines(foes)
         if (lines.isEmpty()) return

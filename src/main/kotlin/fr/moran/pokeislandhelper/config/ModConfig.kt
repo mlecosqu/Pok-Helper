@@ -21,6 +21,8 @@ class Settings {
     var battlePanelRight: Boolean = true          // à droite (sinon à gauche)
     var battlePanelY: Int = 80                 // sous la vignette de l'adversaire
     var recommendations: Int = 3
+    var lookPanel: Boolean = true                 // aussi en regardant un Pokémon, hors combat
+    var lookDistance: Double = 24.0
 }
 
 object ModConfig {

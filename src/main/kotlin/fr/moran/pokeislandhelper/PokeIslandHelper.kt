@@ -13,6 +13,8 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents
+import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents
+import net.minecraft.client.gui.screens.ChatScreen
 import net.minecraft.client.KeyMapping
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
@@ -46,10 +48,14 @@ object PokeIslandHelper : ClientModInitializer {
         HudRenderCallback.EVENT.register { g, _ ->
             if (Minecraft.getInstance().screen == null) BattlePanel.render(g)
         }
-        // …et par-dessus l'interface de combat de Cobblemon quand elle est ouverte.
+        // …et par-dessus n'importe quel écran pendant un combat (interface de combat Cobblemon,
+        // écrans de raid ajoutés par le serveur…). La touche du panneau y marche aussi.
         ScreenEvents.AFTER_INIT.register { _, screen, _, _ ->
-            if (screen is BattleGUI) {
-                ScreenEvents.afterRender(screen).register { _, g, _, _, _ -> BattlePanel.render(g) }
+            ScreenEvents.afterRender(screen).register { _, g, _, _, _ ->
+                if (screen is BattleGUI || CobbleBridge.inBattle()) BattlePanel.render(g)
+            }
+            ScreenKeyboardEvents.afterKeyPress(screen).register { _, key, scancode, _ ->
+                if (screen !is ChatScreen && CobbleBridge.inBattle() && keyPanel.matches(key, scancode)) togglePanel()
             }
         }
 
@@ -66,15 +72,17 @@ object PokeIslandHelper : ClientModInitializer {
             mc.setScreen(TeamScreen())
         }
         while (keyTeam.consumeClick()) mc.setScreen(TeamScreen())
-        while (keyPanel.consumeClick()) {
-            BattlePanel.enabled = !BattlePanel.enabled
-            toast(mc, "Panneau de combat : " + if (BattlePanel.enabled) "activé" else "désactivé")
-        }
+        while (keyPanel.consumeClick()) togglePanel()
         while (keyHighlight.consumeClick()) {
             Highlight.enabled = !Highlight.enabled
             Highlight.clear()
             toast(mc, "Surbrillance Pokédex : " + if (Highlight.enabled) "activée" else "désactivée")
         }
+    }
+
+    private fun togglePanel() {
+        BattlePanel.enabled = !BattlePanel.enabled
+        toast(Minecraft.getInstance(), "Panneau de combat : " + if (BattlePanel.enabled) "activé" else "désactivé")
     }
 
     private fun toast(mc: Minecraft, msg: String) {

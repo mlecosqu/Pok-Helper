@@ -49,7 +49,23 @@ object Commands {
         d.register(literal("praid")
             .then(literal("tera").then(argument("types", StringArgumentType.greedyString()).executes(::tera)))
             .then(literal("reset").executes { BattlePanel.typeOverride = null; ok(it, "Types de l'adversaire : automatiques.") })
+            .then(literal("debug").executes(::debug))
         )
+    }
+
+    /** Diagnostic : ce que le mod voit du combat en cours (à lancer pendant un raid). */
+    private fun debug(c: Ctx): Int {
+        val mc = net.minecraft.client.Minecraft.getInstance()
+        val foes = CobbleBridge.currentFoes()
+        val lines = listOf(
+            "Combat Cobblemon détecté : ${if (CobbleBridge.inBattle()) "oui" else "non"}",
+            "Panneau activé : ${if (BattlePanel.enabled) "oui" else "non"}",
+            "Écran ouvert : ${mc.screen?.javaClass?.name ?: "aucun"}",
+            "Adversaires lus : ${foes.size} " + foes.joinToString { "${it.name} (${it.types.joinToString("/") { t -> t.fr }})" },
+            "Pokémon dans l'équipe : ${CobbleBridge.partyForBattle().size}",
+        )
+        lines.forEach { c.source.sendFeedback(Component.literal(it).withStyle(ChatFormatting.AQUA)) }
+        return 1
     }
 
     private fun slotArg() = argument("n", IntegerArgumentType.integer(1, 6))
@@ -108,7 +124,7 @@ object Commands {
         val types = raw.split(Regex("[\\s/,]+")).filter { it.isNotBlank() }.map { PType.parse(it) ?: return err(c, "Type inconnu : $it") }
         if (types.isEmpty() || types.size > 2) return err(c, "Donne 1 ou 2 types, ex. /praid tera Acier")
         BattlePanel.typeOverride = types
-        return ok(c, "Adversaire traité comme ${types.joinToString("/") { it.fr }} jusqu'à la fin du combat.")
+        return ok(c, "Adversaire traité comme ${types.joinToString("/") { it.fr }} jusqu'à la fin du prochain combat (ou /praid reset).")
     }
 
     /** Modifie l'emplacement n ; renvoyer null supprime l'emplacement. */

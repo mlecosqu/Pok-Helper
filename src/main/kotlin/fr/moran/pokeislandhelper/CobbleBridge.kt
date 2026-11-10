@@ -14,6 +14,7 @@ import fr.moran.pokeislandhelper.team.MonSnapshot
 import fr.moran.pokeislandhelper.team.Names
 import fr.moran.pokeislandhelper.team.StatKey
 import net.minecraft.client.Minecraft
+import net.minecraft.world.entity.projectile.ProjectileUtil
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.chat.Component
 import net.minecraft.resources.ResourceLocation
@@ -85,6 +86,37 @@ object CobbleBridge {
     }
 
     fun inBattle(): Boolean = try { CobblemonClient.battle != null } catch (t: Throwable) { false }
+
+    /**
+     * Pokémon visé au viseur, jusqu'à [maxDist] blocs (bien plus loin que la portée normale, pour
+     * les boss de raid). Un bloc entre toi et lui bloque la visée. Tes propres Pokémon sont ignorés.
+     */
+    fun lookedAtFoe(maxDist: Double): Foe? = try {
+        val mc = Minecraft.getInstance()
+        val player = mc.player
+        if (player == null || mc.level == null) null
+        else {
+            val eye = player.getEyePosition(1f)
+            val end = eye.add(player.getViewVector(1f).scale(maxDist))
+            val box = player.boundingBox.expandTowards(end.subtract(eye)).inflate(1.0)
+            val hit = ProjectileUtil.getEntityHitResult(player, eye, end, box,
+                { e -> e is PokemonEntity && e.ownerUUID != player.uuid && !e.isSpectator }, maxDist * maxDist)
+            val entity = hit?.entity as? PokemonEntity
+            if (entity == null) null
+            else {
+                val blockDist = player.pick(maxDist, 1f, false).location.distanceToSqr(eye)
+                if (blockDist < hit.location.distanceToSqr(eye)) null
+                else {
+                    val form = entity.pokemon.form
+                    val types = listOfNotNull(form.primaryType, form.secondaryType).mapNotNull { PType.parse(it.name) }
+                    if (types.isEmpty()) null else Foe(entity.pokemon.species.translatedName.string, types)
+                }
+            }
+        }
+    } catch (t: Throwable) {
+        PokeIslandHelper.warnOnce("look", "Lecture du Pokémon visé impossible", t)
+        null
+    }
 
     // ---------- Équipe ----------
 
