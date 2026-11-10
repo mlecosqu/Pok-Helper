@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "pokeislandhelper",
+  "version": "${version}",
+  "name": "PokeIsland Helper",
+  "description": "Surbrillance des Pokémon non capturés, faiblesses en combat/raid et planificateur d'équipe (EV, IV, talent, nature).",
+  "authors": ["Moran"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      { "adapter": "kotlin", "value": "fr.moran.pokeislandhelper.PokeIslandHelper" }
+    ]
+  },
+  "mixins": ["pokeislandhelper.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*",
+    "fabric-language-kotlin": "*",
+    "cobblemon": ">=1.6.0"
+  }
+}
