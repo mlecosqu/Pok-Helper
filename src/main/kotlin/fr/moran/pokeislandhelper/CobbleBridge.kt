@@ -91,8 +91,15 @@ object CobbleBridge {
     data class MoveInfo(val name: String, val type: PType)
     data class PartyMon(val slot: Int, val name: String, val types: List<PType>, val damagingMoves: List<MoveInfo>, val fainted: Boolean)
 
+    // Le nom de l'équipe change selon la version de Cobblemon (party / myParty) : on essaie les deux.
     private fun party(): List<Pair<Int, Pokemon>> = try {
-        CobblemonClient.storage.myParty.slots.mapIndexedNotNull { i, p -> p?.let { i to it } }
+        val storage: Any = CobblemonClient.storage
+        val partyObj = listOf("getParty", "getMyParty").firstNotNullOfOrNull { name ->
+            runCatching { storage.javaClass.getMethod(name).invoke(storage) }.getOrNull()
+        } ?: error("équipe introuvable")
+        val slots: List<Any?> = runCatching { partyObj.javaClass.getMethod("getSlots").invoke(partyObj) as List<*> }
+            .getOrElse { (partyObj as Iterable<*>).toList() }
+        slots.mapIndexedNotNull { i, p -> (p as? Pokemon)?.let { i to it } }
     } catch (t: Throwable) {
         PokeIslandHelper.warnOnce("party", "Lecture de l'équipe impossible", t)
         emptyList()
