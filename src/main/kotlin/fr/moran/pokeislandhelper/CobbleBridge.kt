@@ -56,7 +56,13 @@ object CobbleBridge {
 
     // ---------- Combat ----------
 
-    data class Foe(val name: String, val types: List<PType>)
+    data class Foe(
+        val name: String,
+        val types: List<PType>,
+        val speciesId: String = "",
+        val aspects: Set<String> = emptySet(),
+        val own: Boolean = false,      // un de tes Pokémon
+    )
 
     /** Pokémon adverses actifs dans le combat en cours (vide hors combat). */
     fun currentFoes(): List<Foe> = try {
@@ -100,7 +106,7 @@ object CobbleBridge {
             val end = eye.add(player.getViewVector(1f).scale(maxDist))
             val box = player.boundingBox.expandTowards(end.subtract(eye)).inflate(1.0)
             val hit = ProjectileUtil.getEntityHitResult(player, eye, end, box,
-                { e -> e is PokemonEntity && e.ownerUUID != player.uuid && !e.isSpectator }, maxDist * maxDist)
+                { e -> e is PokemonEntity && !e.isSpectator }, maxDist * maxDist)
             val entity = hit?.entity as? PokemonEntity
             if (entity == null) null
             else {
@@ -109,7 +115,9 @@ object CobbleBridge {
                 else {
                     val form = entity.pokemon.form
                     val types = listOfNotNull(form.primaryType, form.secondaryType).mapNotNull { PType.parse(it.name) }
-                    if (types.isEmpty()) null else Foe(entity.pokemon.species.translatedName.string, types)
+                    val aspects = runCatching { entity.pokemon.aspects.toSet() }.getOrDefault(emptySet())
+                    if (types.isEmpty()) null else Foe(entity.pokemon.species.translatedName.string, types,
+                        entity.pokemon.species.resourceIdentifier.path, aspects, entity.ownerUUID == player.uuid)
                 }
             }
         }
@@ -175,6 +183,61 @@ object CobbleBridge {
             PokeIslandHelper.warnOnce("snapshot", "Lecture des stats impossible", t)
             null
         }
+    }
+
+    data class PartyEvoMon(val slot: Int, val name: String, val speciesId: String, val aspects: Set<String>,
+                           val state: fr.moran.pokeislandhelper.evo.MonState)
+
+    /** Équipe avec ce qu'il faut pour suivre les évolutions (niveau, bonheur, objet tenu, attaques). */
+    fun partyForEvolution(): List<PartyEvoMon> = party().mapNotNull { (i, p) ->
+        try {
+            val item = p.heldItem()
+            val moves = runCatching { p.moveSet.getMoves() }.getOrDefault(emptyList())
+            PartyEvoMon(
+                slot = i + 1,
+                name = p.species.translatedName.string,
+                speciesId = p.species.resourceIdentifier.path,
+                aspects = runCatching { p.aspects.toSet() }.getOrDefault(emptySet()),
+                state = fr.moran.pokeislandhelper.evo.MonState(
+                    level = p.level,
+                    friendship = p.friendship,
+                    heldItem = if (item.isEmpty) "" else BuiltInRegistries.ITEM.getKey(item.item).toString(),
+                    moves = moves.map { it.template.name }.toSet(),
+                    moveTypes = moves.map { it.template.elementalType.name.lowercase() }.toSet(),
+                    gender = p.gender.name.lowercase(),
+                ),
+            )
+        } catch (t: Throwable) {
+            PokeIslandHelper.warnOnce("partyevo", "Lecture de l'équipe (évolutions) impossible", t)
+            null
+        }
+    }
+
+    /** Id d'espèce ("eevee") à partir d'un nom anglais ou traduit ("Évoli"), ou null. */
+    fun findSpeciesId(input: String): String? = try {
+        (PokemonSpecies.getByName(Names.key(input))
+            ?: PokemonSpecies.species.firstOrNull { Names.key(it.translatedName.string) == Names.key(input) })
+            ?.resourceIdentifier?.path
+    } catch (t: Throwable) {
+        null
+    }
+
+    /** Noms traduits utilisés pour décrire les évolutions. */
+    val lexicon = object : fr.moran.pokeislandhelper.evo.Lexicon {
+        override fun species(id: String) = runCatching { PokemonSpecies.getByName(id)?.translatedName?.string }
+            .getOrNull() ?: id
+        override fun item(id: String): String = runCatching {
+            val rl = ResourceLocation.tryParse(id) ?: return id
+            if (!BuiltInRegistries.ITEM.containsKey(rl)) return fr.moran.pokeislandhelper.evo.EvoText.readable(id)
+            BuiltInRegistries.ITEM.get(rl).description.string
+        }.getOrDefault(id)
+        override fun move(id: String): String = translated("cobblemon.move.$id") ?: id
+        override fun biome(id: String): String {
+            val rl = ResourceLocation.tryParse(id) ?: return id
+            return translated("biome.${rl.namespace}.${rl.path}") ?: fr.moran.pokeislandhelper.evo.EvoText.readable(id)
+        }
+        private fun translated(key: String): String? =
+            Component.translatable(key).string.takeIf { it != key }
     }
 
     /** Vérifie qu'une espèce existe (nom anglais ou traduit). Renvoie son nom affiché, ou null. */

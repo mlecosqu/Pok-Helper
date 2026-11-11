@@ -7,6 +7,9 @@ import com.mojang.brigadier.context.CommandContext
 import fr.moran.pokeislandhelper.battle.BattlePanel
 import fr.moran.pokeislandhelper.battle.PType
 import fr.moran.pokeislandhelper.config.ModConfig
+import fr.moran.pokeislandhelper.evo.EvoIndex
+import fr.moran.pokeislandhelper.evo.EvoLookup
+import fr.moran.pokeislandhelper.evo.EvoText
 import fr.moran.pokeislandhelper.team.Names
 import fr.moran.pokeislandhelper.team.PlanSlot
 import fr.moran.pokeislandhelper.team.StatKey
@@ -46,6 +49,10 @@ object Commands {
             .then(literal("reload").executes { ModConfig.load(); ok(it, "Fichiers rechargés.") })
         )
 
+        d.register(literal("pevo")
+            .executes { PokeIslandHelper.openEvoScreenNextTick = true; 1 }
+            .then(argument("espece", StringArgumentType.greedyString()).executes(::evo)))
+
         d.register(literal("praid")
             .then(literal("tera").then(argument("types", StringArgumentType.greedyString()).executes(::tera)))
             .then(literal("reset").executes { BattlePanel.typeOverride = null; ok(it, "Types de l'adversaire : automatiques.") })
@@ -65,6 +72,30 @@ object Commands {
             "Pokémon dans l'équipe : ${CobbleBridge.partyForBattle().size}",
         )
         lines.forEach { c.source.sendFeedback(Component.literal(it).withStyle(ChatFormatting.AQUA)) }
+        return 1
+    }
+
+    /** /pevo <espèce> : comment elle évolue, et de quoi elle évolue. */
+    private fun evo(c: Ctx): Int {
+        if (!EvoIndex.ready) return err(c, "Évolutions encore en chargement, réessaie dans quelques secondes.")
+        val input = StringArgumentType.getString(c, "espece")
+        val id = CobbleBridge.findSpeciesId(input) ?: return err(c, "Espèce inconnue : $input")
+        val lex = CobbleBridge.lexicon
+        val all = EvoIndex.all()
+        c.source.sendFeedback(Component.literal(lex.species(id)).withStyle(ChatFormatting.GOLD))
+        val pre = EvoLookup.preEvolutions(all, id)
+        pre.forEach { e ->
+            val form = if (e.fromAspects.isEmpty()) "" else " (${e.fromAspects.joinToString()})"
+            c.source.sendFeedback(Component.literal("← évolue de ${lex.species(e.fromId.substringAfter(':'))}$form : ${EvoText.describe(e, lex)}")
+                .withStyle(ChatFormatting.GRAY))
+        }
+        val next = all.filter { it.fromId.substringAfter(':') == id }
+        if (next.isEmpty()) c.source.sendFeedback(Component.literal("N'évolue pas.").withStyle(ChatFormatting.GRAY))
+        next.forEach { e ->
+            val form = if (e.fromAspects.isEmpty()) "" else " [forme ${e.fromAspects.joinToString()}]"
+            c.source.sendFeedback(Component.literal("→ ${lex.species(e.resultSpecies)}$form : ").withStyle(ChatFormatting.LIGHT_PURPLE)
+                .append(Component.literal(EvoText.describe(e, lex)).withStyle(ChatFormatting.WHITE)))
+        }
         return 1
     }
 

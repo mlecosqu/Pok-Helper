@@ -2,6 +2,9 @@ package fr.moran.pokeislandhelper.battle
 
 import fr.moran.pokeislandhelper.CobbleBridge
 import fr.moran.pokeislandhelper.config.ModConfig
+import fr.moran.pokeislandhelper.evo.EvoIndex
+import fr.moran.pokeislandhelper.evo.EvoLookup
+import fr.moran.pokeislandhelper.evo.EvoText
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphics
 import net.minecraft.network.chat.Component
@@ -86,7 +89,7 @@ object BattlePanel {
                 out += Component.literal(label).withStyle { it.withColor(color) }.append(typeList(ts))
             }
 
-            val picks = BattleAdvisor.rank(team, types).take(ModConfig.settings.recommendations)
+            val picks = if (foe.own) emptyList() else BattleAdvisor.rank(team, types).take(ModConfig.settings.recommendations)
             if (picks.isNotEmpty()) {
                 out += Component.literal("À envoyer :").withStyle { it.withColor(0x55FF55).withUnderlined(true) }
                 for (p in picks) {
@@ -99,8 +102,30 @@ object BattlePanel {
                         .append(colored(BattleAdvisor.formatMult(p.worstTaken), takenColor(p.worstTaken)))
                 }
             }
+
+            // Évolutions : seulement hors combat, en regardant un Pokémon
+            if (!CobbleBridge.inBattle() && ModConfig.settings.evoInPanel && foe.speciesId.isNotEmpty()) {
+                out += evolutionLines(foe.speciesId, foe.aspects)
+            }
         }
         return out
+    }
+
+    private val evoCache = HashMap<String, List<Component>>()
+
+    private fun evolutionLines(speciesId: String, aspects: Set<String>): List<Component> {
+        if (!EvoIndex.ready) return emptyList()
+        return evoCache.getOrPut(speciesId + aspects.sorted()) {
+            val evos = EvoLookup.forPokemon(EvoIndex.all(), speciesId, aspects)
+            if (evos.isEmpty()) return@getOrPut listOf(
+                Component.literal("N'évolue pas").withStyle { it.withColor(0x888888) })
+            val lex = CobbleBridge.lexicon
+            listOf<Component>(Component.literal("Évolutions :").withStyle { it.withColor(0xC080FF).withUnderlined(true) }) +
+                evos.take(6).map { e ->
+                    Component.literal("→ ${lex.species(e.resultSpecies)} : ").withStyle { it.withColor(0xC080FF) }
+                        .append(Component.literal(EvoText.describe(e, lex)))
+                }
+        }
     }
 
     private fun typeList(types: List<PType>): MutableComponent {

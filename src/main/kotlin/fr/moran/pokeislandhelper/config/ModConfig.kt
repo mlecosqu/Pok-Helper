@@ -23,6 +23,7 @@ class Settings {
     var recommendations: Int = 3
     var lookPanel: Boolean = true                 // aussi en regardant un Pokémon, hors combat
     var lookDistance: Double = 24.0
+    var evoInPanel: Boolean = true                // conditions d'évolution en regardant un Pokémon
 }
 
 object ModConfig {

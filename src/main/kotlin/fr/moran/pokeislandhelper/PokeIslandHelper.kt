@@ -31,9 +31,12 @@ object PokeIslandHelper : ClientModInitializer {
     private lateinit var keyTeam: KeyMapping
     private lateinit var keyPanel: KeyMapping
     private lateinit var keyHighlight: KeyMapping
+    private lateinit var keyEvo: KeyMapping
+    @Volatile var openEvoScreenNextTick = false
 
     override fun onInitializeClient() {
         ModConfig.load()
+        fr.moran.pokeislandhelper.evo.EvoIndex.loadAsync()
 
         keyTeam = KeyBindingHelper.registerKeyBinding(
             KeyMapping("key.pokeislandhelper.team", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_P, CATEGORY))
@@ -41,6 +44,9 @@ object PokeIslandHelper : ClientModInitializer {
             KeyMapping("key.pokeislandhelper.panel", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O, CATEGORY))
         keyHighlight = KeyBindingHelper.registerKeyBinding(
             KeyMapping("key.pokeislandhelper.highlight", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_U, CATEGORY))
+
+        keyEvo = KeyBindingHelper.registerKeyBinding(
+            KeyMapping("key.pokeislandhelper.evo", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_J, CATEGORY))
 
         ClientTickEvents.END_CLIENT_TICK.register { mc -> onTick(mc) }
 
@@ -72,6 +78,11 @@ object PokeIslandHelper : ClientModInitializer {
             mc.setScreen(TeamScreen())
         }
         while (keyTeam.consumeClick()) mc.setScreen(TeamScreen())
+        if (openEvoScreenNextTick) {
+            openEvoScreenNextTick = false
+            mc.setScreen(fr.moran.pokeislandhelper.evo.EvoScreen())
+        }
+        while (keyEvo.consumeClick()) mc.setScreen(fr.moran.pokeislandhelper.evo.EvoScreen())
         while (keyPanel.consumeClick()) togglePanel()
         while (keyHighlight.consumeClick()) {
             Highlight.enabled = !Highlight.enabled

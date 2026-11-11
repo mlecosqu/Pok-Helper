@@ -40,6 +40,19 @@ Tu décris l'équipe que tu veux construire, et l'écran compare avec ton équip
 Les noms marchent en français ou en anglais (Jovial = Jolly, Peau Dure = roughskin).
 Tout est enregistré dans `.minecraft/config/pokeislandhelper-team.json`, modifiable à la main.
 
+### 4. Conditions d'évolution
+- En regardant un Pokémon (sauvage ou à toi), le panneau affiche ses évolutions et leurs conditions :
+  niveau, objet, échange (+ objet tenu), bonheur, moment de la journée, attaque connue, biome, etc.
+- **Touche J** (ou `/pevo` tout seul) : écran « Évolutions de l'équipe » avec, pour chaque Pokémon
+  de ton équipe, ses évolutions et sa progression : ✔ condition remplie, ✘ pas encore
+  (niv. 12/16, bonheur 120/160, objet tenu, attaque connue…), sans marque = à vérifier toi-même
+  (moment de la journée, biome…). Une évolution entièrement remplie s'affiche en vert.
+- `/pevo <espèce>` (ex. `/pevo Évoli`) : toutes ses évolutions, formes régionales comprises,
+  et de quel Pokémon il évolue.
+- Les données viennent des fichiers de Cobblemon installés chez toi : si PokeIsland a modifié une
+  évolution uniquement côté serveur, le mod affiche la version de base de Cobblemon.
+- `"evoInPanel": false` dans `config/pokeislandhelper.json` pour ne pas l'afficher dans le panneau.
+
 ## Réglages
 `.minecraft/config/pokeislandhelper.json` (créé au premier lancement) :
 couleurs, distance, ligne de vue, position du panneau (`battlePanelRight`, `battlePanelY`),
