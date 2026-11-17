@@ -57,6 +57,7 @@ object PokeIslandHelper : ClientModInitializer {
         // …et par-dessus n'importe quel écran pendant un combat (interface de combat Cobblemon,
         // écrans de raid ajoutés par le serveur…). La touche du panneau y marche aussi.
         ScreenEvents.AFTER_INIT.register { _, screen, _, _ ->
+            fr.moran.pokeislandhelper.inv.ChestTracker.onScreenOpened(screen)
             ScreenEvents.afterRender(screen).register { _, g, _, _, _ ->
                 if (screen is BattleGUI || CobbleBridge.inBattle()) BattlePanel.render(g)
             }

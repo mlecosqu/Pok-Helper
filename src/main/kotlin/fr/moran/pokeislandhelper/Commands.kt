@@ -7,6 +7,8 @@ import com.mojang.brigadier.context.CommandContext
 import fr.moran.pokeislandhelper.battle.BattlePanel
 import fr.moran.pokeislandhelper.battle.PType
 import fr.moran.pokeislandhelper.config.ModConfig
+import fr.moran.pokeislandhelper.inv.ChestTracker
+import fr.moran.pokeislandhelper.inv.InvFormat
 import fr.moran.pokeislandhelper.evo.EvoIndex
 import fr.moran.pokeislandhelper.evo.EvoLookup
 import fr.moran.pokeislandhelper.evo.EvoText
@@ -53,6 +55,15 @@ object Commands {
             .executes { PokeIslandHelper.openEvoScreenNextTick = true; 1 }
             .then(argument("espece", StringArgumentType.greedyString()).executes(::evo)))
 
+        d.register(literal("pinv")
+            .executes(::invSummary)
+            .then(literal("vente").executes { copyLast(it, sale = true) })
+            .then(literal("dernier").executes { copyLast(it, sale = false) })
+            .then(literal("tout").executes(::invAll))
+            .then(literal("suite").executes(::invNext))
+            .then(literal("cherche").then(argument("objet", StringArgumentType.greedyString()).executes(::invSearch)))
+            .then(literal("oublier").executes { ChestTracker.forget(); ok(it, "Coffres mémorisés effacés pour ce serveur.") }))
+
         d.register(literal("praid")
             .then(literal("tera").then(argument("types", StringArgumentType.greedyString()).executes(::tera)))
             .then(literal("reset").executes { BattlePanel.typeOverride = null; ok(it, "Types de l'adversaire : automatiques.") })
@@ -96,6 +107,77 @@ object Commands {
             c.source.sendFeedback(Component.literal("→ ${lex.species(e.resultSpecies)}$form : ").withStyle(ChatFormatting.LIGHT_PURPLE)
                 .append(Component.literal(EvoText.describe(e, lex)).withStyle(ChatFormatting.WHITE)))
         }
+        return 1
+    }
+
+    // ---------- /pinv : contenu des coffres ----------
+
+    /** Messages Discord en attente quand le texte dépasse la limite de 2000 caractères. */
+    private var pendingChunks: List<String> = emptyList()
+    private var chunkIndex = 0
+
+    private fun copyChunks(c: Ctx, chunks: List<String>, what: String): Int {
+        pendingChunks = chunks
+        chunkIndex = 0
+        net.minecraft.client.Minecraft.getInstance().keyboardHandler.clipboard = chunks.first()
+        val more = if (chunks.size > 1) " Message 1/${chunks.size} : colle-le, puis /pinv suite pour le suivant." else ""
+        return ok(c, "$what copié ! Fais Ctrl+V sur Discord.$more")
+    }
+
+    private fun invSummary(c: Ctx): Int {
+        ChestTracker.ensureLoaded()
+        val chests = ChestTracker.all()
+        val kinds = InvFormat.aggregate(chests.map { it.items }).size
+        c.source.sendFeedback(Component.literal("${chests.size} coffre(s) mémorisé(s), $kinds objet(s) différent(s).").withStyle(ChatFormatting.GOLD))
+        listOf(
+            "Ouvre tes coffres une fois pour qu'ils soient mémorisés.",
+            "/pinv vente : copie le dernier coffre ouvert (liste « À vendre ») pour Discord",
+            "/pinv dernier : pareil, avec le nom du coffre",
+            "/pinv tout : récapitulatif de tous tes coffres + fichiers CSV/texte dans config/",
+            "/pinv cherche <objet> : dans quel coffre il se trouve",
+            "/pinv oublier : effacer la mémoire des coffres",
+        ).forEach { c.source.sendFeedback(Component.literal(it).withStyle(ChatFormatting.GRAY)) }
+        return 1
+    }
+
+    private fun copyLast(c: Ctx, sale: Boolean): Int {
+        ChestTracker.ensureLoaded()
+        val last = ChestTracker.last ?: return err(c, "Ouvre (puis ferme) le coffre à copier d'abord.")
+        if (last.items.isEmpty()) return err(c, "Le dernier coffre ouvert est vide.")
+        val player = net.minecraft.client.Minecraft.getInstance().player?.name?.string ?: ""
+        val title = if (sale) "À vendre — $player" else last.label
+        val footer = if (sale) "Intéressé ? MP en jeu ($player)" else null
+        return copyChunks(c, InvFormat.discord(title, last.items, footer), "Contenu du coffre")
+    }
+
+    private fun invAll(c: Ctx): Int {
+        ChestTracker.ensureLoaded()
+        val chests = ChestTracker.all()
+        if (chests.isEmpty()) return err(c, "Aucun coffre mémorisé : ouvre tes coffres une fois d'abord.")
+        val chunks = InvFormat.discord("Inventaire (${chests.size} coffres)", InvFormat.aggregate(chests.map { it.items }))
+        val dir = ChestTracker.writeExports(chunks.joinToString("\n\n"))
+        c.source.sendFeedback(Component.literal("Fichiers écrits dans $dir : pokeislandhelper-inventaire.csv (Excel) et -discord.txt")
+            .withStyle(ChatFormatting.GRAY))
+        return copyChunks(c, chunks, "Récapitulatif")
+    }
+
+    private fun invNext(c: Ctx): Int {
+        if (chunkIndex + 1 >= pendingChunks.size) return err(c, "Plus rien à copier.")
+        chunkIndex++
+        net.minecraft.client.Minecraft.getInstance().keyboardHandler.clipboard = pendingChunks[chunkIndex]
+        return ok(c, "Message ${chunkIndex + 1}/${pendingChunks.size} copié.")
+    }
+
+    private fun invSearch(c: Ctx): Int {
+        ChestTracker.ensureLoaded()
+        val q = StringArgumentType.getString(c, "objet")
+        val hits = InvFormat.search(ChestTracker.all(), q)
+        if (hits.isEmpty()) return err(c, "Rien trouvé pour « $q » dans les coffres mémorisés.")
+        hits.take(10).forEach { (chest, item) ->
+            c.source.sendFeedback(Component.literal("${item.count} × ${item.name}").withStyle(ChatFormatting.GOLD)
+                .append(Component.literal(" — ${chest.where()}").withStyle(ChatFormatting.GRAY)))
+        }
+        if (hits.size > 10) c.source.sendFeedback(Component.literal("… et ${hits.size - 10} autre(s).").withStyle(ChatFormatting.GRAY))
         return 1
     }
 

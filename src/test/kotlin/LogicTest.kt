@@ -4,6 +4,7 @@ import fr.moran.pokeislandhelper.battle.PType.*
 import fr.moran.pokeislandhelper.battle.TypeChart
 import fr.moran.pokeislandhelper.team.*
 import fr.moran.pokeislandhelper.evo.*
+import fr.moran.pokeislandhelper.inv.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -107,5 +108,26 @@ class LogicTest {
         assertEquals(true, EvoText.parts(scizor, lex, state)[1].ok)
         val sylveon = EvoEdge("cobblemon:eevee", emptySet(), "sylveon", "level_up", null, listOf(EvoReq("has_move_type", mapOf("type" to "fairy"))))
         assertEquals(false, EvoText.parts(sylveon, lex, state).single().ok)
+    }
+
+    private fun ic(id: String, name: String, n: Int) = ItemCount().apply { this.id = id; this.name = name; count = n }
+
+    @Test fun inventoryExport() {
+        val a = listOf(ic("minecraft:gunpowder", "Poudre à canon", 64), ic("minecraft:bone", "Os", 10))
+        val b = listOf(ic("minecraft:gunpowder", "Poudre à canon", 100))
+        val agg = InvFormat.aggregate(listOf(a, b))
+        assertEquals(164, agg.first { it.id == "minecraft:gunpowder" }.count)
+        assertEquals("Os", agg.first().name) // tri alphabétique
+        assertEquals("164 (2 stacks + 36)", InvFormat.qty(164))
+        assertEquals("128 (2 stacks)", InvFormat.qty(128))
+        val msg = InvFormat.discord("À vendre — Moran", agg, "MP en jeu").single()
+        assertTrue(msg.startsWith("**À vendre — Moran**"))
+        assertTrue(msg.contains("• 164 (2 stacks + 36) × Poudre à canon"))
+        val many = (1..200).map { ic("x:item$it", "Objet numéro $it avec un nom long", 1) }
+        val chunks = InvFormat.discord("Inventaire", many)
+        assertTrue(chunks.size > 1 && chunks.all { it.length <= 1900 })
+        val chest = ChestRecord().apply { label = "Coffre"; x = 1; y = 2; z = 3; items = a.toMutableList() }
+        assertEquals(1, InvFormat.search(listOf(chest), "poudre a").size)
+        assertTrue(InvFormat.csv(listOf(chest)).contains("Coffre;1;2;3;;Poudre à canon;minecraft:gunpowder;64"))
     }
 }

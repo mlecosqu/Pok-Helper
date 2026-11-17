@@ -53,6 +53,18 @@ Tout est enregistré dans `.minecraft/config/pokeislandhelper-team.json`, modifi
   évolution uniquement côté serveur, le mod affiche la version de base de Cobblemon.
 - `"evoInPanel": false` dans `config/pokeislandhelper.json` pour ne pas l'afficher dans le panneau.
 
+### 5. Contenu des coffres (inventaire et ventes)
+Le mod retient le contenu de chaque coffre, tonneau ou boîte de Shulker que tu ouvres sur ton île
+(Shulkers rangées dedans comprises). Les menus de boutique du serveur sont ignorés.
+- `/pinv vente` : copie le dernier coffre ouvert sous forme de liste « À vendre » prête pour Discord
+  (Ctrl+V dans Discord). Range ce que tu vends dans un coffre, ouvre-le, ferme-le, tape la commande.
+- `/pinv dernier` : pareil, avec le nom du coffre comme titre.
+- `/pinv tout` : récapitulatif de tous tes coffres ; écrit aussi `config/pokeislandhelper-inventaire.csv`
+  (à ouvrir dans Excel) et `config/pokeislandhelper-inventaire-discord.txt`.
+- `/pinv suite` : message suivant, si la liste dépasse la limite de 2000 caractères de Discord.
+- `/pinv cherche <objet>` : dans quel coffre se trouve un objet. `/pinv oublier` : tout effacer.
+- Un coffre n'est à jour que depuis la dernière fois que tu l'as ouvert.
+
 ## Réglages
 `.minecraft/config/pokeislandhelper.json` (créé au premier lancement) :
 couleurs, distance, ligne de vue, position du panneau (`battlePanelRight`, `battlePanelY`),
